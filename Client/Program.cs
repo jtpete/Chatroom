@@ -10,7 +10,10 @@ namespace Client
     {
         static void Main(string[] args)
         {
+            UI.MainHeader();
             Client client = new Client("127.0.0.1", 9999);
+            client.Chat();
+            
             client.Send();
             client.Recieve();
             Console.ReadLine();

@@ -10,11 +10,21 @@ namespace Client
     {
         public static void DisplayMessage(string message)
         {
-            Console.WriteLine(message);
+            char[] charsToTrim = {'\0'};
+            Console.WriteLine($"{message.Trim(charsToTrim)}");
         }
         public static string GetInput()
         {
             return Console.ReadLine();
+        }
+        public static void MainHeader()
+        {
+            Console.Clear();
+            Console.WriteLine("╔═══════════════════════════════════════════════╗");
+            Console.WriteLine("║         Welcome to this Chat Room             ║");
+            Console.WriteLine("║                                               ║");
+            Console.WriteLine("╚═══════════════════════════════════════════════╝");
+
         }
     }
 }

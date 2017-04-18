@@ -12,23 +12,61 @@ namespace Client
     {
         TcpClient clientSocket;
         NetworkStream stream;
+        string chatName;
         public Client(string IP, int port)
         {
             clientSocket = new TcpClient();
             clientSocket.Connect(IPAddress.Parse(IP), port);
             stream = clientSocket.GetStream();
+            SyncReceive();
+            SetChatName();
+            SendChatName();
+            SyncReceive();
         }
-        public void Send()
+        public void Chat()
+        {
+            while (true)
+            {
+                Send();
+                Recieve();
+            }
+        }
+
+        public async Task Send()
         {
             string messageString = UI.GetInput();
             byte[] message = Encoding.ASCII.GetBytes(messageString);
-            stream.Write(message, 0, message.Count());
+            await stream.WriteAsync(message, 0, message.Count());
         }
-        public void Recieve()
+
+        public async Task Recieve()
         {
-            byte[] recievedMessage = new byte[256];
-            stream.Read(recievedMessage, 0, recievedMessage.Length);
-            UI.DisplayMessage(Encoding.ASCII.GetString(recievedMessage));
+            byte[] receivedMessage = new byte[256];
+            await stream.ReadAsync(receivedMessage, 0, receivedMessage.Length);
+            string message = Encoding.ASCII.GetString(receivedMessage);
+            UI.DisplayMessage(message);
+        }
+        public void SyncReceive()
+        {
+            byte[] receivedMessage = new byte[256];
+            stream.Read(receivedMessage, 0, receivedMessage.Length);
+            string message = Encoding.ASCII.GetString(receivedMessage);
+            UI.DisplayMessage(message);
+        }
+        public string SetChatName()
+        {
+            string response = UI.GetInput();
+            if (response != "")
+                chatName = response;
+            else
+                SetChatName();
+            return chatName;
+        }
+        public void SendChatName()
+        {
+            string messageString = chatName;
+            byte[] message = Encoding.ASCII.GetBytes(messageString);
+            stream.Write(message, 0, message.Count());
         }
     }
 }
