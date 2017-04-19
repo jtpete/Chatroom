@@ -18,17 +18,17 @@ namespace Client
             clientSocket = new TcpClient();
             clientSocket.Connect(IPAddress.Parse(IP), port);
             stream = clientSocket.GetStream();
-            SyncReceive();
+            Receive();
             SetChatName();
             SendChatName();
-            SyncReceive();
+            Receive();
         }
         public void Chat()
         {
             while (true)
             {
                 Send();
-                Recieve();
+                Receive();
             }
         }
 
@@ -39,20 +39,14 @@ namespace Client
             await stream.WriteAsync(message, 0, message.Count());
         }
 
-        public async Task Recieve()
+        public async Task Receive()
         {
             byte[] receivedMessage = new byte[256];
             await stream.ReadAsync(receivedMessage, 0, receivedMessage.Length);
             string message = Encoding.ASCII.GetString(receivedMessage);
             UI.DisplayMessage(message);
         }
-        public void SyncReceive()
-        {
-            byte[] receivedMessage = new byte[256];
-            stream.Read(receivedMessage, 0, receivedMessage.Length);
-            string message = Encoding.ASCII.GetString(receivedMessage);
-            UI.DisplayMessage(message);
-        }
+
         public string SetChatName()
         {
             string response = UI.GetInput();

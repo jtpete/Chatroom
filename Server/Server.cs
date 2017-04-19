@@ -25,12 +25,13 @@ namespace Server
         public void Run()
         {
             TcpClient clientSocket = default(TcpClient);
-            AcceptClient(clientSocket);
+            AcceptFirstClient(clientSocket);
             Respond();
             while (true)
             {
                 try
                 {
+                    AcceptClient(clientSocket);
                     client.Recieve(clientSocket);
                     Respond();
                 }
@@ -41,7 +42,18 @@ namespace Server
             }
 
         }
-        private void AcceptClient(TcpClient clientSocket)
+        private async Task AcceptClient(TcpClient clientSocket)
+        {
+            clientSocket = await server.AcceptTcpClientAsync().ConfigureAwait(false);
+            NetworkStream stream = clientSocket.GetStream();
+            client = new Client(stream, clientSocket);
+            if (ConfirmUniqueId())
+            {
+                string clientStatus = client.NotifyStatus();
+                messageQueue.Enqueue(new Message(client, clientStatus));
+            }
+        }
+        private void AcceptFirstClient(TcpClient clientSocket)
         {
             clientSocket = server.AcceptTcpClient();
             NetworkStream stream = clientSocket.GetStream();
@@ -49,7 +61,6 @@ namespace Server
             if (ConfirmUniqueId())
             {
                 string clientStatus = client.NotifyStatus();
-                Console.WriteLine(clientStatus);
                 messageQueue.Enqueue(new Message(client, clientStatus));
             }
         }
@@ -81,11 +92,17 @@ namespace Server
         private void Respond()
         {
             Message message = default(Message);
-            if (messageQueue.TryDequeue(out message))
+            while (messageQueue.Count > 0)
             {
-                Console.WriteLine(message.Display());
-                client.Send(message.Display());
+                if (messageQueue.TryDequeue(out message))
+                {
+                    Console.WriteLine(message.Display());
+                    foreach (string person in allClients.Keys)
+                        allClients[person].Send(message.Display());
+                }
             }
         }
     }
 }
+
+
