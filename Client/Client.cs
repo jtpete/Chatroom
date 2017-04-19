@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Client
@@ -18,33 +19,50 @@ namespace Client
             clientSocket = new TcpClient();
             clientSocket.Connect(IPAddress.Parse(IP), port);
             stream = clientSocket.GetStream();
-            Receive();
+            ReceiveChatName();
             SetChatName();
             SendChatName();
-            Receive();
         }
         public void Chat()
         {
+            Thread receiveThread = new Thread(new ThreadStart(Receive));
+            receiveThread.Start();
+            Send();
+
+        }
+        public async Task Send()
+        {
             while (true)
             {
-                Send();
-                Receive();
+                try
+                {
+                    string messageString = UI.GetInput();
+                    byte[] message = Encoding.ASCII.GetBytes(messageString);
+                    await stream.WriteAsync(message, 0, message.Count());
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("Error trying to send to server " + e);
+                }
             }
         }
 
-        public async Task Send()
+        public void Receive()
         {
-            string messageString = UI.GetInput();
-            byte[] message = Encoding.ASCII.GetBytes(messageString);
-            await stream.WriteAsync(message, 0, message.Count());
-        }
-
-        public async Task Receive()
-        {
-            byte[] receivedMessage = new byte[256];
-            await stream.ReadAsync(receivedMessage, 0, receivedMessage.Length);
-            string message = Encoding.ASCII.GetString(receivedMessage);
-            UI.DisplayMessage(message);
+            while (true)
+            {
+                try
+                {
+                    byte[] receivedMessage = new byte[256];
+                    stream.Read(receivedMessage, 0, receivedMessage.Length);
+                    string message = Encoding.ASCII.GetString(receivedMessage);
+                    UI.DisplayMessage(message);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("Error Receiving Servers Message " + e);
+                }
+            }
         }
 
         public string SetChatName()
@@ -55,6 +73,13 @@ namespace Client
             else
                 SetChatName();
             return chatName;
+        }
+        public void ReceiveChatName()
+        {
+            byte[] receivedMessage = new byte[256];
+            stream.Read(receivedMessage, 0, receivedMessage.Length);
+            string message = Encoding.ASCII.GetString(receivedMessage);
+            UI.DisplayMessage(message);
         }
         public void SendChatName()
         {

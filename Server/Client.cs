@@ -18,36 +18,68 @@ namespace Server
         {
             stream = Stream;
             client = Client;
-            UserId = ReceiveNewUserId();
+            ReceiveNewUserId();
             startChat = DateTime.Now;
         }
-        public void Send(string Message)
+        public async Task Send(string Message)
         {
-            byte[] message = Encoding.ASCII.GetBytes(Message);
-            stream.Write(message, 0, message.Count());
+            try
+            {
+                byte[] message = Encoding.ASCII.GetBytes(Message);
+                await stream.WriteAsync(message, 0, message.Count());
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Send Server Client Error" + e);
+            }
         }
-        public void Recieve(TcpClient clientSocket)
+        public void Recieve()
+        {
+           while (true)
+            {
+                try
+                {
+                    char[] charsToTrim = { '\0' };
+                    byte[] recievedMessage = new byte[256];
+                    stream.Read(recievedMessage, 0, recievedMessage.Length);
+                    string recievedMessageString = Encoding.ASCII.GetString(recievedMessage);
+                    Message message = new Message(this, recievedMessageString.Trim(charsToTrim));
+                    Server.messageQueue.Enqueue(message);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("Receive Server Client Error" + e);
+                }
+            }
+        }
+        public void ReceiveNewUserId()
         {
             char[] charsToTrim = { '\0' };
             byte[] recievedMessage = new byte[256];
-            stream.Read(recievedMessage, 0, recievedMessage.Length);
+            try
+            {
+                Send("What is your chat id for this chat room?");
+                stream.Read(recievedMessage, 0, recievedMessage.Length);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("New User Send/Receive Server Error" + e);
+            }
             string recievedMessageString = Encoding.ASCII.GetString(recievedMessage);
-            Message message = new Message(this, recievedMessageString.Trim(charsToTrim));
-            Server.messageQueue.Enqueue(message);
+            UserId = recievedMessageString.Trim(charsToTrim);
+
         }
-        public string ReceiveNewUserId()
+        public void ReceiveDifferentUserId()
         {
-            char[] charsToTrim = { '\0' };
-            Send("What is your chat id for this chat room?");
-            byte[] recievedMessage = new byte[256];
-            stream.Read(recievedMessage, 0, recievedMessage.Length);
-            string recievedMessageString = Encoding.ASCII.GetString(recievedMessage);
-            return recievedMessageString.Trim(charsToTrim);
-        }
-        public string ReceiveDifferentUserId()
-        {
-            Send("That Chat Id already exists...please choose a different name.");
-            return ReceiveNewUserId();
+            try
+            {
+                Send("That Chat Id already exists...please choose a different name.");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Different Id Send Server Error" + e);
+            }
+            ReceiveNewUserId();
         }
         public string NotifyStatus()
         {

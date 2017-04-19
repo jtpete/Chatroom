@@ -16,52 +16,52 @@ namespace Server
         public static Client client;
         public static Dictionary<string, Client> allClients = new Dictionary<string, Client>();
         TcpListener server;
+        TcpClient clientSocket = default(TcpClient);
         public Server()
         {
-            Console.WriteLine("Starting Server Listener...");
-            server = new TcpListener(IPAddress.Parse("127.0.0.1"), 9999);
-            server.Start();
+            try
+            {
+                Console.WriteLine("Starting Server Listener...");
+                server = new TcpListener(IPAddress.Parse("127.0.0.1"), 9999);
+                server.Start();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Error staring server " + e);
+            }
         }
         public void Run()
         {
-            TcpClient clientSocket = default(TcpClient);
-            AcceptFirstClient(clientSocket);
-            Respond();
+            Thread respondThread = new Thread(new ThreadStart(Respond));
+            respondThread.Start();
+            Thread acceptClientThread = new Thread(new ThreadStart(AcceptClient));
+            acceptClientThread.Start();
+
+            Parallel.Invoke(AcceptClient, Respond);
+
+        }
+        private void AcceptClient()
+        {
             while (true)
             {
                 try
                 {
-                    AcceptClient(clientSocket);
-                    client.Recieve(clientSocket);
-                    Respond();
+                    TcpClient clientSocket = default(TcpClient);
+                    clientSocket = server.AcceptTcpClient();
+                    NetworkStream stream = clientSocket.GetStream();
+                    client = new Client(stream, clientSocket);
+                    if (ConfirmUniqueId())
+                    {
+                        string clientStatus = client.NotifyStatus();
+                        messageQueue.Enqueue(new Message(client, clientStatus));
+                    }
+                    Thread clientThread = new Thread(new ThreadStart(client.Recieve));
+                    clientThread.Start();
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine(e);
+                    Console.WriteLine("Error accepting client on server " + e);
                 }
-            }
-
-        }
-        private async Task AcceptClient(TcpClient clientSocket)
-        {
-            clientSocket = await server.AcceptTcpClientAsync().ConfigureAwait(false);
-            NetworkStream stream = clientSocket.GetStream();
-            client = new Client(stream, clientSocket);
-            if (ConfirmUniqueId())
-            {
-                string clientStatus = client.NotifyStatus();
-                messageQueue.Enqueue(new Message(client, clientStatus));
-            }
-        }
-        private void AcceptFirstClient(TcpClient clientSocket)
-        {
-            clientSocket = server.AcceptTcpClient();
-            NetworkStream stream = clientSocket.GetStream();
-            client = new Client(stream, clientSocket);
-            if (ConfirmUniqueId())
-            {
-                string clientStatus = client.NotifyStatus();
-                messageQueue.Enqueue(new Message(client, clientStatus));
             }
         }
         private bool ConfirmUniqueId()
@@ -78,7 +78,7 @@ namespace Server
                     try
                     {
                         uniqueUserId = true;
-                        client.UserId = client.ReceiveDifferentUserId();
+                        client.ReceiveDifferentUserId();
                         allClients.Add(client.UserId, client);
                     }
                     catch
@@ -92,13 +92,16 @@ namespace Server
         private void Respond()
         {
             Message message = default(Message);
-            while (messageQueue.Count > 0)
+            while (true)
             {
                 if (messageQueue.TryDequeue(out message))
                 {
                     Console.WriteLine(message.Display());
-                    foreach (string person in allClients.Keys)
-                        allClients[person].Send(message.Display());
+                    Parallel.ForEach(allClients, data =>
+                    {
+                        if (!message.sender.UserId.Equals(data.Key))
+                            data.Value.Send(message.Display());
+                    });
                 }
             }
         }
