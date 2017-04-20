@@ -15,8 +15,10 @@ namespace Server
         public static ConcurrentQueue<Message> messageQueue = new ConcurrentQueue<Message>();
         public static Client client;
         public static Dictionary<string, Client> allClients = new Dictionary<string, Client>();
+        public static Dictionary<string, Client> removeClients = new Dictionary<string, Client>();
         TcpListener server;
         TcpClient clientSocket = default(TcpClient);
+        SaveMessages saveThese = new SaveMessages(new Database());
         public Server()
         {
             try
@@ -60,7 +62,7 @@ namespace Server
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("Error accepting client on server " + e);
+                        Console.WriteLine("Error accepting client on server " + e);
                 }
             }
         }
@@ -97,14 +99,29 @@ namespace Server
                 if (messageQueue.TryDequeue(out message))
                 {
                     Console.WriteLine(message.Display());
-                    Parallel.ForEach(allClients, data =>
+                    saveThese.Save(message);
+                    foreach(string person in allClients.Keys)
                     {
-                        if (!message.sender.UserId.Equals(data.Key))
-                            data.Value.Send(message.Display());
-                    });
+                        if (!message.sender.UserId.Equals(person) && !allClients[person].endChat.HasValue)
+                            allClients[person].Send(message.Display());
+                        if (allClients[person].endChat.HasValue)
+                            removeClients.Add(client.UserId, client);
+                    }
+                    RemoveClientsAndNotify();
                 }
+                
             }
         }
+        private void RemoveClientsAndNotify()
+        {
+            if (removeClients.Count > 0)
+            {
+                foreach (string person in removeClients.Keys)
+                    allClients.Remove(person);
+                removeClients.Clear();
+            }
+        }
+
     }
 }
 

@@ -30,16 +30,20 @@ namespace Server
             }
             catch (Exception e)
             {
-                Console.WriteLine("Send Server Client Error" + e);
+                RemoveClient();
+                Message message = new Message(this, NotifyStatus());
+                Server.messageQueue.Enqueue(message);
+                client.Close();
             }
         }
         public void Recieve()
         {
-           while (true)
+            bool clientDone = false;
+            while (!clientDone)
             {
+                char[] charsToTrim = { '\0' };
                 try
                 {
-                    char[] charsToTrim = { '\0' };
                     byte[] recievedMessage = new byte[256];
                     stream.Read(recievedMessage, 0, recievedMessage.Length);
                     string recievedMessageString = Encoding.ASCII.GetString(recievedMessage);
@@ -48,7 +52,11 @@ namespace Server
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("Receive Server Client Error" + e);
+                    RemoveClient();
+                    Message message = new Message(this, NotifyStatus().Trim(charsToTrim));
+                    Server.messageQueue.Enqueue(message);
+                    client.Close();
+                    clientDone = true;
                 }
             }
         }
@@ -80,6 +88,10 @@ namespace Server
                 Console.WriteLine("Different Id Send Server Error" + e);
             }
             ReceiveNewUserId();
+        }
+        public void RemoveClient()
+        {
+            endChat = DateTime.Now;
         }
         public string NotifyStatus()
         {
